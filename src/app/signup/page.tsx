@@ -25,7 +25,7 @@ async function signupAction(formData: FormData) {
 
   const { id } = await createUser({ email, displayName, password });
   await setSessionCookie(id);
-  redirect("/dashboard");
+  redirect("/aide?welcome=1");
 }
 
 export default async function SignupPage({

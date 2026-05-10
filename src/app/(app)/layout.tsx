@@ -31,7 +31,7 @@ export default async function AppLayout({
             <NavLink href="/predictions/carre" label="Carré d'As" />
             <NavLink href="/predictions/knockout" label="Élim." />
             <NavLink href="/leaderboard" label="Classement" />
-            <NavLink href="/profile" label="Profil" />
+            <NavLink href="/aide" label="Aide" />
             {user.is_admin ? <NavLink href="/admin" label="Admin" /> : null}
           </nav>
           <div className="flex items-center gap-2">

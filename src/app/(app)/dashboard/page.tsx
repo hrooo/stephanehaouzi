@@ -1,8 +1,16 @@
 import Link from "next/link";
 import { Avatar } from "@/components/Avatar";
+import { ZlatanQuote } from "@/components/ZlatanQuote";
 import { requireUser } from "@/lib/auth";
 import { query, queryOne } from "@/lib/db";
-import { computeLeaderboard, getGroupLockAt, isGroupStageLocked } from "@/lib/scoring";
+import {
+  computeLeaderboard,
+  getGroupLockAt,
+  isGroupStageLocked,
+  scoreKnockoutPrediction,
+} from "@/lib/scoring";
+import { getRemindersFor, type Reminder } from "@/lib/reminders";
+import { zlatanCommentForKnockout } from "@/lib/zlatan";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +54,37 @@ export default async function DashboardPage() {
        limit 5`,
   );
 
+  const { reminders } = await getRemindersFor(user.id);
+  const recentResults = await query<{
+    id: number;
+    label: string;
+    score_a: number;
+    score_b: number;
+    qualifier_team_id: number;
+    name_a: string;
+    name_b: string;
+    flag_a: string;
+    flag_b: string;
+    pred_score_a: number | null;
+    pred_score_b: number | null;
+    pred_qualifier: number | null;
+  }>(
+    `select m.id, m.label, m.score_a, m.score_b, m.qualifier_team_id,
+            ta.name as name_a, tb.name as name_b,
+            ta.flag as flag_a, tb.flag as flag_b,
+            kp.score_a as pred_score_a,
+            kp.score_b as pred_score_b,
+            kp.qualifier_team_id as pred_qualifier
+       from knockout_matches m
+       join teams ta on ta.id = m.team_a_id
+       join teams tb on tb.id = m.team_b_id
+       left join knockout_predictions kp
+         on kp.match_id = m.id and kp.user_id = $1
+       where m.score_a is not null and m.score_b is not null
+       order by m.kickoff_at desc
+       limit 3`,
+    [user.id],
+  );
   const board = await computeLeaderboard();
   const myRank = board.findIndex((b) => b.user_id === user.id);
   const me = myRank >= 0 ? board[myRank] : null;
@@ -67,14 +106,24 @@ export default async function DashboardPage() {
               ? "Le tournoi est lancé — les pronos de poule sont verrouillés."
               : `Pronos de poule + Carré d'As verrouillés le ${lockAt.toLocaleString("fr-FR", { dateStyle: "full", timeStyle: "short" })}.`}
           </p>
-          <Link
-            href="/profile"
-            className="mt-2 inline-block text-sm font-medium text-brand hover:underline"
-          >
-            Modifier mon avatar →
-          </Link>
+          <div className="mt-2 flex flex-wrap gap-3 text-sm">
+            <Link href="/profile" className="font-medium text-brand hover:underline">
+              Modifier mon avatar →
+            </Link>
+            <Link href="/aide" className="font-medium text-brand hover:underline">
+              Comment ça marche ? →
+            </Link>
+          </div>
         </div>
       </section>
+
+      {reminders.length > 0 ? (
+        <section className="space-y-3">
+          {reminders.map((r, i) => (
+            <ReminderBanner key={i} reminder={r} />
+          ))}
+        </section>
+      ) : null}
 
       <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <StatCard
@@ -120,6 +169,76 @@ export default async function DashboardPage() {
         </section>
       ) : null}
 
+      {recentResults.length > 0 ? (
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-brand-dark">Résultats récents</h2>
+          <div className="mt-3 space-y-4">
+            {recentResults.map((r) => {
+              const points =
+                r.pred_score_a != null &&
+                r.pred_score_b != null &&
+                r.pred_qualifier != null
+                  ? scoreKnockoutPrediction(
+                      {
+                        score_a: r.pred_score_a,
+                        score_b: r.pred_score_b,
+                        qualifier_team_id: r.pred_qualifier,
+                      },
+                      {
+                        score_a: r.score_a,
+                        score_b: r.score_b,
+                        qualifier_team_id: r.qualifier_team_id,
+                      },
+                    )
+                  : 0;
+              const zlatan =
+                r.pred_score_a != null
+                  ? zlatanCommentForKnockout(points, {
+                      matchId: r.id,
+                      userId: user.id,
+                    })
+                  : null;
+              return (
+                <div
+                  key={r.id}
+                  className="rounded-xl border border-slate-100 bg-slate-50 p-4"
+                >
+                  <div className="flex items-center justify-between text-xs text-slate-500">
+                    <span className="font-medium uppercase tracking-wide">
+                      {r.label}
+                    </span>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-bold ${
+                        points >= 4
+                          ? "bg-emerald-100 text-emerald-700"
+                          : points >= 1
+                            ? "bg-amber-100 text-amber-700"
+                            : "bg-slate-200 text-slate-600"
+                      }`}
+                    >
+                      {points} pt{points !== 1 ? "s" : ""}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-base font-semibold text-slate-800">
+                    {r.flag_a} {r.name_a} {r.score_a} – {r.score_b}{" "}
+                    {r.flag_b} {r.name_b}
+                  </p>
+                  {zlatan ? (
+                    <div className="mt-2">
+                      <ZlatanQuote comment={zlatan} points={points} />
+                    </div>
+                  ) : (
+                    <p className="mt-1 text-xs italic text-slate-500">
+                      Tu n&apos;avais pas pronostiqué ce match.
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
+
       {upcoming.length > 0 ? (
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-brand-dark">Prochains matchs élim.</h2>
@@ -146,6 +265,40 @@ export default async function DashboardPage() {
           </ul>
         </section>
       ) : null}
+    </div>
+  );
+}
+
+function ReminderBanner({ reminder }: { reminder: Reminder }) {
+  const palette = {
+    info: "border-blue-200 bg-blue-50 text-blue-900",
+    warn: "border-amber-200 bg-amber-50 text-amber-900",
+    urgent: "border-red-300 bg-red-50 text-red-900",
+  } as const;
+  const ctaPalette = {
+    info: "bg-blue-600 hover:bg-blue-700",
+    warn: "bg-amber-600 hover:bg-amber-700",
+    urgent: "bg-red-600 hover:bg-red-700",
+  } as const;
+  return (
+    <div
+      className={`flex flex-col gap-3 rounded-2xl border-2 p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between ${palette[reminder.level]}`}
+    >
+      <div className="flex items-start gap-3">
+        <span className="text-2xl" aria-hidden>
+          {reminder.icon}
+        </span>
+        <div>
+          <p className="font-semibold">{reminder.title}</p>
+          <p className="mt-0.5 text-sm">{reminder.body}</p>
+        </div>
+      </div>
+      <Link
+        href={reminder.href}
+        className={`inline-flex shrink-0 items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold text-white shadow transition ${ctaPalette[reminder.level]}`}
+      >
+        {reminder.cta} →
+      </Link>
     </div>
   );
 }

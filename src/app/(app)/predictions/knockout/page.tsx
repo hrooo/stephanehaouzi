@@ -1,7 +1,10 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { ZlatanQuote } from "@/components/ZlatanQuote";
 import { requireUser } from "@/lib/auth";
 import { query } from "@/lib/db";
+import { scoreKnockoutPrediction } from "@/lib/scoring";
+import { zlatanCommentForKnockout } from "@/lib/zlatan";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +29,11 @@ type Match = {
   name_b: string | null;
   flag_a: string | null;
   flag_b: string | null;
+  score_a: number | null;
+  score_b: number | null;
+  qualifier_team_id: number | null;
+  qualifier_name: string | null;
+  qualifier_flag: string | null;
 };
 
 type Pred = {
@@ -103,11 +111,14 @@ export default async function KnockoutPage({
   const matches = await query<Match>(
     `select m.id, m.stage, m.label, m.kickoff_at,
             m.team_a_id, m.team_b_id,
+            m.score_a, m.score_b, m.qualifier_team_id,
             ta.name as name_a, tb.name as name_b,
-            ta.flag as flag_a, tb.flag as flag_b
+            ta.flag as flag_a, tb.flag as flag_b,
+            tq.name as qualifier_name, tq.flag as qualifier_flag
        from knockout_matches m
        left join teams ta on ta.id = m.team_a_id
        left join teams tb on tb.id = m.team_b_id
+       left join teams tq on tq.id = m.qualifier_team_id
        order by m.kickoff_at asc`,
   );
 
@@ -167,6 +178,7 @@ export default async function KnockoutPage({
                   key={m.id}
                   match={m}
                   pred={predMap.get(m.id)}
+                  userId={user.id}
                 />
               ))}
             </div>
@@ -180,13 +192,112 @@ export default async function KnockoutPage({
 function KnockoutMatchCard({
   match,
   pred,
+  userId,
 }: {
   match: Match;
   pred?: Pred;
+  userId: string;
 }) {
   const kickoff = new Date(match.kickoff_at);
   const isLocked = kickoff.getTime() <= Date.now();
   const teamsKnown = match.team_a_id != null && match.team_b_id != null;
+  const isFinished =
+    match.score_a != null &&
+    match.score_b != null &&
+    match.qualifier_team_id != null;
+
+  if (isFinished) {
+    const points = pred
+      ? scoreKnockoutPrediction(
+          {
+            score_a: pred.score_a,
+            score_b: pred.score_b,
+            qualifier_team_id: pred.qualifier_team_id,
+          },
+          {
+            score_a: match.score_a,
+            score_b: match.score_b,
+            qualifier_team_id: match.qualifier_team_id,
+          },
+        )
+      : 0;
+    const zlatan = pred
+      ? zlatanCommentForKnockout(points, { matchId: match.id, userId })
+      : null;
+
+    return (
+      <div
+        id={`m${match.id}`}
+        className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+      >
+        <div className="flex items-center justify-between text-xs text-slate-500">
+          <span className="font-medium uppercase tracking-wide">{match.label}</span>
+          <span className="font-semibold text-emerald-600">✅ Terminé</span>
+        </div>
+
+        <div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+          <div className="text-right">
+            <div className="font-semibold text-slate-800">
+              {match.flag_a} {match.name_a}
+            </div>
+          </div>
+          <div className="text-2xl font-bold tabular-nums text-brand-dark">
+            {match.score_a} – {match.score_b}
+          </div>
+          <div className="text-left">
+            <div className="font-semibold text-slate-800">
+              {match.flag_b} {match.name_b}
+            </div>
+          </div>
+        </div>
+        <p className="mt-2 text-center text-xs text-slate-500">
+          Qualifié·e : {match.qualifier_flag} {match.qualifier_name}
+        </p>
+
+        <div className="mt-3 rounded-lg bg-slate-50 p-3 text-sm">
+          {pred ? (
+            <>
+              <p className="text-slate-600">
+                Ton prono :{" "}
+                <span className="font-semibold text-slate-800">
+                  {pred.score_a} – {pred.score_b}
+                </span>{" "}
+                · qualifié{" "}
+                <span className="font-semibold text-slate-800">
+                  {pred.qualifier_team_id === match.team_a_id
+                    ? `${match.flag_a} ${match.name_a}`
+                    : `${match.flag_b} ${match.name_b}`}
+                </span>
+              </p>
+              <p className="mt-1">
+                <span
+                  className={`inline-block rounded-full px-2 py-0.5 text-xs font-bold ${
+                    points >= 4
+                      ? "bg-emerald-100 text-emerald-700"
+                      : points >= 1
+                        ? "bg-amber-100 text-amber-700"
+                        : "bg-slate-200 text-slate-600"
+                  }`}
+                >
+                  {points} pt{points !== 1 ? "s" : ""}
+                </span>
+              </p>
+            </>
+          ) : (
+            <p className="italic text-slate-500">
+              Tu n&apos;as pas pronostiqué ce match.
+            </p>
+          )}
+        </div>
+
+        {zlatan ? (
+          <div className="mt-3">
+            <ZlatanQuote comment={zlatan} points={points} />
+          </div>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <form

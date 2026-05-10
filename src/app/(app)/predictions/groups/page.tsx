@@ -1,8 +1,10 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { ZlatanQuote } from "@/components/ZlatanQuote";
 import { requireUser } from "@/lib/auth";
 import { query } from "@/lib/db";
-import { isGroupStageLocked } from "@/lib/scoring";
+import { isGroupStageLocked, scoreGroupPrediction } from "@/lib/scoring";
+import { zlatanCommentForGroup } from "@/lib/zlatan";
 
 export const dynamic = "force-dynamic";
 
@@ -78,6 +80,20 @@ export default async function GroupsPage({
   );
   const predByGroup = new Map(preds.map((p) => [p.group_letter, p]));
 
+  const results = await query<{
+    group_letter: string;
+    first_team_id: number | null;
+    second_team_id: number | null;
+  }>(
+    `select group_letter, first_team_id, second_team_id from group_results`,
+  );
+  const teamById = new Map(teams.map((t) => [t.id, t]));
+  const resultByGroup = new Map(
+    results
+      .filter((r) => r.first_team_id != null && r.second_team_id != null)
+      .map((r) => [r.group_letter, r]),
+  );
+
   return (
     <div className="space-y-6">
       <div>
@@ -108,6 +124,87 @@ export default async function GroupsPage({
         {GROUPS.map((g) => {
           const groupTeams = teamsByGroup.get(g) ?? [];
           const pred = predByGroup.get(g);
+          const result = resultByGroup.get(g);
+
+          if (result) {
+            const points = pred
+              ? scoreGroupPrediction(
+                  { first: pred.first_team_id, second: pred.second_team_id },
+                  { first: result.first_team_id, second: result.second_team_id },
+                )
+              : 0;
+            const zlatan = pred
+              ? zlatanCommentForGroup(points, {
+                  groupLetter: g,
+                  userId: user.id,
+                })
+              : null;
+            const firstActual = teamById.get(result.first_team_id!);
+            const secondActual = teamById.get(result.second_team_id!);
+            const firstPred = pred ? teamById.get(pred.first_team_id) : null;
+            const secondPred = pred ? teamById.get(pred.second_team_id) : null;
+
+            return (
+              <div
+                key={g}
+                className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+              >
+                <div className="mb-3 flex items-center justify-between">
+                  <h2 className="text-lg font-bold text-brand-dark">Poule {g}</h2>
+                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700">
+                    ✅ Terminée
+                  </span>
+                </div>
+
+                <p className="text-xs uppercase tracking-wide text-slate-500">
+                  Classement officiel
+                </p>
+                <ul className="mt-1 space-y-1 text-sm text-slate-700">
+                  <li>
+                    🥇 {firstActual?.flag} {firstActual?.name}
+                  </li>
+                  <li>
+                    🥈 {secondActual?.flag} {secondActual?.name}
+                  </li>
+                </ul>
+
+                <div className="mt-3 rounded-lg bg-slate-50 p-3 text-sm">
+                  {pred ? (
+                    <>
+                      <p className="text-slate-600">
+                        Ton prono : 🥇 {firstPred?.flag} {firstPred?.name} · 🥈{" "}
+                        {secondPred?.flag} {secondPred?.name}
+                      </p>
+                      <p className="mt-1">
+                        <span
+                          className={`inline-block rounded-full px-2 py-0.5 text-xs font-bold ${
+                            points >= 3
+                              ? "bg-emerald-100 text-emerald-700"
+                              : points >= 1
+                                ? "bg-amber-100 text-amber-700"
+                                : "bg-slate-200 text-slate-600"
+                          }`}
+                        >
+                          {points} pt{points !== 1 ? "s" : ""}
+                        </span>
+                      </p>
+                    </>
+                  ) : (
+                    <p className="italic text-slate-500">
+                      Tu n&apos;as pas pronostiqué cette poule.
+                    </p>
+                  )}
+                </div>
+
+                {zlatan ? (
+                  <div className="mt-3">
+                    <ZlatanQuote comment={zlatan} points={points} />
+                  </div>
+                ) : null}
+              </div>
+            );
+          }
+
           return (
             <form
               key={g}
