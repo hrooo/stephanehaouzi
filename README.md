@@ -17,8 +17,9 @@ deux premiers :
 
 **Phase à élimination directe** — pour chaque match (1/16 → finale) :
 
-- 🎯 **3 pts** si bon score exact
-- ✅ **1 pt** si bonne équipe qualifiée
+- 🎯 **3 pts** si bon qualifié **et** bon score exact
+- ✅ **1 pt** si bon qualifié, mauvais score
+- 0 pt si mauvais qualifié (le qualifié doit être correct pour marquer — pas de cumul)
 
 **Bonus Carré d'As** — à pronostiquer **avant le coup d'envoi du tournoi** :
 

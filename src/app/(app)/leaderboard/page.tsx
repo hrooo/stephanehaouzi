@@ -136,7 +136,7 @@ export default async function LeaderboardPage({
             <strong>Phase de poule</strong> (top 2) : 3 pts dans l&apos;ordre · 2 pts dans le désordre · 1 pt avec 1 bon · 0 sinon
           </li>
           <li>
-            <strong>Phase à élimination</strong> : 3 pts si bon score · 1 pt si bonne équipe qualifiée
+            <strong>Phase à élimination</strong> : 3 pts si bon qualifié + bon score · 1 pt si bon qualifié seul · 0 sinon (pas de cumul)
           </li>
           <li>
             <strong>Carré d&apos;As</strong> (avant tournoi) : 10 / 7 / 4 / 1 / 0 pts pour 4 / 3 / 2 / 1 / 0 demi-finalistes corrects (compté à partir des demi-finales)

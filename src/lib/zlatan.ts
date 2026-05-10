@@ -6,35 +6,33 @@
  * Le ton : self-aggrandizing à la 3e personne, condescendant, jamais méchant.
  */
 
-const KNOCKOUT_4 = [
-  "4/4. Zlatan il salue. Zlatan il salue rarement. Profite, ça arrivera plus.",
-  "Score exact ET qualifié. Zlatan il dit : « normal, t'as copié sur Zlatan ».",
+// 3 pts : qualifié ET score exact
+const KNOCKOUT_3 = [
+  "3/3. Zlatan il salue. Zlatan il salue rarement. Profite, ça arrivera plus.",
+  "Bon qualifié et score pile poil. Zlatan il dit : « normal, t'as copié sur Zlatan ».",
   "Zlatan il aurait fait pareil. Mais sans regarder. En mangeant. Avec une seule main.",
   "Le carton plein. Zlatan il applaudit. Zlatan il applaudit jamais d'habitude. Tu lui dois une fière chandelle.",
-  "4 points pile. Zlatan il a presque envie de te féliciter. Zlatan il a dit PRESQUE.",
+  "3 points pile. Zlatan il a presque envie de te féliciter. Zlatan il a dit PRESQUE.",
   "Tu as trouvé tout. Zlatan il soupçonne un coup de chance cosmique. Zlatan il croit pas au hasard.",
 ];
 
-const KNOCKOUT_3 = [
-  "Score exact, mauvais qualifié. Zlatan il rigole. Zlatan il rigole de toi, pas avec toi.",
-  "3 points. Zlatan il dit : « pas mal pour quelqu'un qui n'est pas Zlatan ».",
-  "Score nickel mais le qualifié... Zlatan il préfère pas en parler par respect.",
-  "T'as deviné le score. Zlatan il pense que c'est un accident. Zlatan il pense souvent juste.",
-];
-
+// 1 pt : bon qualifié mais mauvais score
 const KNOCKOUT_1 = [
   "1 point. Zlatan il regarde ailleurs. Zlatan il regarde Zlatan dans le miroir.",
   "Tu as trouvé le qualifié, pas le score. Zlatan il appelle ça : médiocre avec espoir.",
-  "1 petit point. Zlatan il en aurait mis 4. Mais Zlatan il joue pas dans la même cour.",
+  "1 petit point. Zlatan il en aurait mis 3. Mais Zlatan il joue pas dans la même cour.",
   "Bon, t'as eu le qualifié. Zlatan il dit que même un perroquet aurait pu.",
+  "Le qualifié, oui. Le score, non. Zlatan il appelle ça la moitié du chemin. Et l'autre moitié, c'est Zlatan.",
 ];
 
+// 0 pt : mauvais qualifié (peu importe le score)
 const KNOCKOUT_0 = [
   "Zéro pointé. Zlatan il dit rien. Zlatan il dit rien parce qu'il y a rien à dire.",
   "0 point. Zlatan il aurait pleuré. Mais Zlatan il pleure jamais. Donc il pleure pas.",
   "Le néant total. Zlatan il propose un cours particulier. Zlatan il est patient. Pas avec tout le monde.",
   "Ton prono était aussi loin de la réalité que toi de Zlatan.",
   "Zlatan il a vu pire. Mais c'était y a longtemps. Et c'était pas Zlatan.",
+  "Mauvais qualifié. Zlatan il dit : « la prochaine fois, regarde un match avant de parier ».",
 ];
 
 const GROUP_3 = [
@@ -100,8 +98,7 @@ export function zlatanCommentForKnockout(
   ctx: { matchId: number; userId: string },
 ): string {
   const seed = `kn:${ctx.userId}:${ctx.matchId}:${points}`;
-  if (points >= 4) return pickFrom(KNOCKOUT_4, seed);
-  if (points === 3) return pickFrom(KNOCKOUT_3, seed);
+  if (points >= 3) return pickFrom(KNOCKOUT_3, seed);
   if (points === 1) return pickFrom(KNOCKOUT_1, seed);
   return pickFrom(KNOCKOUT_0, seed);
 }

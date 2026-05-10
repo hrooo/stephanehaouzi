@@ -45,8 +45,9 @@ export default async function HomePage() {
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="font-semibold text-brand-dark">Phases finales</h2>
           <ul className="mt-2 space-y-1 text-sm text-slate-700">
-            <li>🎯 3 pts — bon score exact</li>
-            <li>✅ 1 pt — équipe qualifiée</li>
+            <li>🎯 3 pts — bon qualifié + bon score</li>
+            <li>✅ 1 pt — bon qualifié, mauvais score</li>
+            <li>0 pt — mauvais qualifié</li>
             <li>… jusqu&apos;à la finale</li>
           </ul>
         </div>

@@ -209,7 +209,7 @@ export default async function DashboardPage() {
                     </span>
                     <span
                       className={`rounded-full px-2 py-0.5 text-xs font-bold ${
-                        points >= 4
+                        points >= 3
                           ? "bg-emerald-100 text-emerald-700"
                           : points >= 1
                             ? "bg-amber-100 text-amber-700"

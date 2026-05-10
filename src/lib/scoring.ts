@@ -46,8 +46,11 @@ export function scoreGroupPrediction(
 
 /**
  * Calcule les points pour un pronostic à élimination directe.
- *  - 3 pts : score exact
- *  - 1 pt  : équipe qualifiée correcte (cumulable avec le score)
+ *  - 3 pts : bon qualifié + bon score (exact)
+ *  - 1 pt  : bon qualifié, mauvais score
+ *  - 0 pt  : mauvais qualifié (peu importe le score)
+ *
+ * Pas de cumul — le qualifié doit être correct pour marquer.
  */
 export function scoreKnockoutPrediction(
   pred: { score_a: number; score_b: number; qualifier_team_id: number },
@@ -57,22 +60,17 @@ export function scoreKnockoutPrediction(
     qualifier_team_id: number | null;
   },
 ): number {
-  let pts = 0;
+  if (result.qualifier_team_id == null) return 0;
+  if (result.qualifier_team_id !== pred.qualifier_team_id) return 0;
   if (
     result.score_a != null &&
     result.score_b != null &&
     result.score_a === pred.score_a &&
     result.score_b === pred.score_b
   ) {
-    pts += 3;
+    return 3;
   }
-  if (
-    result.qualifier_team_id != null &&
-    result.qualifier_team_id === pred.qualifier_team_id
-  ) {
-    pts += 1;
-  }
-  return pts;
+  return 1;
 }
 
 /**

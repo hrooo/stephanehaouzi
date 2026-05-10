@@ -141,7 +141,7 @@ export default async function KnockoutPage({
       <div>
         <h1 className="text-2xl font-bold text-brand-dark">Pronostics — Phase à élimination</h1>
         <p className="mt-1 text-sm text-slate-600">
-          Pour chaque match : score exact (3 pts) + équipe qualifiée (1 pt). Verrouillé au coup d&apos;envoi.
+          Pour chaque match : <strong>3 pts</strong> si bon qualifié + bon score, <strong>1 pt</strong> si bon qualifié seul, <strong>0</strong> sinon. Pas de cumul. Verrouillé au coup d&apos;envoi.
         </p>
         <p className="mt-1 text-xs text-slate-500">
           Les équipes apparaîtront ici au fur et à mesure que l&apos;admin met à jour la grille.
@@ -272,7 +272,7 @@ function KnockoutMatchCard({
               <p className="mt-1">
                 <span
                   className={`inline-block rounded-full px-2 py-0.5 text-xs font-bold ${
-                    points >= 4
+                    points >= 3
                       ? "bg-emerald-100 text-emerald-700"
                       : points >= 1
                         ? "bg-amber-100 text-amber-700"

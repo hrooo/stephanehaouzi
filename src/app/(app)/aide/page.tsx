@@ -124,9 +124,9 @@ export default async function AidePage({
             ["Phase de poule", "🥈 Top 2 corrects mais inversés", "2 pts"],
             ["Phase de poule", "🥉 1 seule équipe correcte", "1 pt"],
             ["Phase de poule", "Aucune trouvée", "0 pt"],
-            ["Élim. directe", "🎯 Score exact", "3 pts"],
-            ["Élim. directe", "✅ Bonne équipe qualifiée", "1 pt (cumulable)"],
-            ["Élim. directe", "Score exact + bon qualifié", "4 pts max / match"],
+            ["Élim. directe", "🎯 Bon qualifié + bon score", "3 pts"],
+            ["Élim. directe", "✅ Bon qualifié, mauvais score", "1 pt"],
+            ["Élim. directe", "❌ Mauvais qualifié", "0 pt (pas de cumul)"],
             ["Carré d'As", "4 demi-finalistes corrects", "10 pts"],
             ["Carré d'As", "3 corrects", "7 pts"],
             ["Carré d'As", "2 corrects", "4 pts"],
@@ -134,8 +134,9 @@ export default async function AidePage({
           ]}
         />
         <p className="mt-3 text-sm text-slate-600">
-          💡 <strong>Astuce</strong> : ne néglige pas le Carré d&apos;As — 10 pts c&apos;est
-          l&apos;équivalent de 3 scores exacts en élim&nbsp;!
+          💡 <strong>Astuce</strong> : en élim, le qualifié est obligatoire pour
+          marquer. Un bon score avec le mauvais qualifié = 0 pt. Le Carré d&apos;As à
+          10 pts vaut autant que 3 matchs élim parfaits&nbsp;!
         </p>
       </Section>
 
