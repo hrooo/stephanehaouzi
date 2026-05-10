@@ -11,6 +11,8 @@
     "db:setup": "node --experimental-strip-types scripts/setup-db.ts"
   },
   "dependencies": {
+    "@dicebear/collection": "^9.4.2",
+    "@dicebear/core": "^9.4.2",
     "bcryptjs": "^2.4.3",
     "jose": "^5.9.6",
     "next": "^16.2.6",

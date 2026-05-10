@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Avatar } from "@/components/Avatar";
 import { requireUser } from "@/lib/auth";
 import { query, queryOne } from "@/lib/db";
 import { computeLeaderboard, getGroupLockAt, isGroupStageLocked } from "@/lib/scoring";
@@ -51,15 +52,28 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-bold text-brand-dark">
-          Salut {user.display_name} 👋
-        </h1>
-        <p className="mt-1 text-slate-600">
-          {locked
-            ? "Le tournoi est lancé — les pronos de poule sont verrouillés."
-            : `Pronos de poule + Carré d'As verrouillés le ${lockAt.toLocaleString("fr-FR", { dateStyle: "full", timeStyle: "short" })}.`}
-        </p>
+      <section className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <Avatar
+          style={user.avatar_style}
+          seed={user.avatar_seed ?? user.display_name}
+          size="xl"
+        />
+        <div className="flex-1">
+          <h1 className="text-2xl font-bold text-brand-dark">
+            Salut {user.display_name} 👋
+          </h1>
+          <p className="mt-1 text-slate-600">
+            {locked
+              ? "Le tournoi est lancé — les pronos de poule sont verrouillés."
+              : `Pronos de poule + Carré d'As verrouillés le ${lockAt.toLocaleString("fr-FR", { dateStyle: "full", timeStyle: "short" })}.`}
+          </p>
+          <Link
+            href="/profile"
+            className="mt-2 inline-block text-sm font-medium text-brand hover:underline"
+          >
+            Modifier mon avatar →
+          </Link>
+        </div>
       </section>
 
       <section className="grid grid-cols-1 gap-4 md:grid-cols-3">

@@ -2,7 +2,9 @@ import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
-import { query } from "@/lib/db";
+import { query, queryOne } from "@/lib/db";
+import { runSync } from "@/lib/sync";
+import { FootballDataError } from "@/lib/football-data";
 
 export const dynamic = "force-dynamic";
 
@@ -80,6 +82,27 @@ async function saveKnockoutMatchAction(formData: FormData) {
   redirect(`/admin?saved=match${id}#match${id}`);
 }
 
+async function syncNowAction() {
+  "use server";
+  await requireAdmin();
+  let qs: string;
+  try {
+    const report = await runSync();
+    qs = `sync=ok&u=${report.knockout_matches_updated}&c=${report.knockout_matches_completed}&g=${report.groups_updated}&t=${report.teams_linked}`;
+  } catch (err) {
+    const msg =
+      err instanceof FootballDataError
+        ? `${err.status}: ${err.body.slice(0, 120)}`
+        : err instanceof Error
+          ? err.message
+          : "erreur inconnue";
+    qs = `sync=err&msg=${encodeURIComponent(msg)}`;
+  }
+  revalidatePath("/admin");
+  revalidatePath("/leaderboard");
+  redirect(`/admin?${qs}#sync`);
+}
+
 function numOrNull(value: FormDataEntryValue | null): number | null {
   if (value == null) return null;
   const s = String(value).trim();
@@ -91,10 +114,23 @@ function numOrNull(value: FormDataEntryValue | null): number | null {
 export default async function AdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{ saved?: string; error?: string }>;
+  searchParams: Promise<{
+    saved?: string;
+    error?: string;
+    sync?: string;
+    u?: string;
+    c?: string;
+    g?: string;
+    t?: string;
+    msg?: string;
+  }>;
 }) {
   await requireAdmin();
-  const { saved, error } = await searchParams;
+  const { saved, error, sync, u, c, g, t: tParam, msg } = await searchParams;
+  const lastSync = await queryOne<{ value: string }>(
+    `select value from settings where key = 'last_sync_at'`,
+  );
+  const apiKeyConfigured = Boolean(process.env.FOOTBALL_DATA_API_KEY);
 
   const teams = await query<Team>(
     `select id, name, flag, group_letter from teams order by group_letter, name`,
@@ -157,6 +193,59 @@ export default async function AdminPage({
       {error ? (
         <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">❌ Erreur — vérifie ta saisie.</p>
       ) : null}
+
+      <section
+        id="sync"
+        className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
+      >
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-bold text-brand-dark">
+              Synchronisation auto des scores
+            </h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Récupère les résultats officiels depuis football-data.org.
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              {apiKeyConfigured
+                ? "🟢 Clé API configurée. Auto-sync toutes les 15 min sur Vercel."
+                : "🔴 FOOTBALL_DATA_API_KEY non défini — l'auto-sync ne marchera pas tant que tu n'as pas ajouté ta clé."}
+            </p>
+            {lastSync?.value ? (
+              <p className="mt-1 text-xs text-slate-500">
+                Dernière synchro :{" "}
+                {new Date(lastSync.value).toLocaleString("fr-FR", {
+                  dateStyle: "short",
+                  timeStyle: "medium",
+                })}
+              </p>
+            ) : null}
+          </div>
+          <form action={syncNowAction}>
+            <button
+              type="submit"
+              className="rounded-lg bg-brand px-4 py-2 font-semibold text-white shadow transition hover:bg-brand-dark"
+            >
+              Synchroniser maintenant
+            </button>
+          </form>
+        </div>
+
+        {sync === "ok" ? (
+          <p className="mt-3 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
+            ✅ Sync OK — {u ?? 0} match(s) élim. mis à jour ({c ?? 0} terminés),{" "}
+            {g ?? 0} groupe(s) finalisés, {tParam ?? 0} équipes liées.
+          </p>
+        ) : null}
+        {sync === "err" ? (
+          <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+            ❌ Erreur de synchro :{" "}
+            <code className="text-xs">
+              {msg ? decodeURIComponent(msg) : "inconnue"}
+            </code>
+          </p>
+        ) : null}
+      </section>
 
       <section className="space-y-3">
         <h2 className="text-xl font-bold text-brand-dark">Phase de poule — résultats officiels</h2>

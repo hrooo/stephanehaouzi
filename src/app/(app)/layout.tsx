@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Avatar } from "@/components/Avatar";
 import { clearSessionCookie, getSessionUser } from "@/lib/auth";
 
 async function logoutAction() {
@@ -30,17 +31,35 @@ export default async function AppLayout({
             <NavLink href="/predictions/carre" label="Carré d'As" />
             <NavLink href="/predictions/knockout" label="Élim." />
             <NavLink href="/leaderboard" label="Classement" />
+            <NavLink href="/profile" label="Profil" />
             {user.is_admin ? <NavLink href="/admin" label="Admin" /> : null}
           </nav>
-          <form action={logoutAction}>
-            <button
-              type="submit"
-              className="rounded-md px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100"
+          <div className="flex items-center gap-2">
+            <Link
+              href="/profile"
+              className="flex items-center gap-2 rounded-full p-1 transition hover:bg-slate-100"
               title={`Connecté : ${user.display_name}`}
             >
-              Déconnexion
-            </button>
-          </form>
+              <Avatar
+                style={user.avatar_style}
+                seed={user.avatar_seed ?? user.display_name}
+                size="sm"
+                alt={user.display_name}
+              />
+              <span className="hidden text-sm font-medium text-slate-700 sm:inline">
+                {user.display_name}
+              </span>
+            </Link>
+            <form action={logoutAction}>
+              <button
+                type="submit"
+                className="rounded-md px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100"
+                title="Se déconnecter"
+              >
+                ⎋
+              </button>
+            </form>
+          </div>
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>

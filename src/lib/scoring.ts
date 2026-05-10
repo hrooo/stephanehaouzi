@@ -3,10 +3,26 @@ import { query } from "@/lib/db";
 export type Scoreboard = {
   user_id: string;
   display_name: string;
+  avatar_style: string;
+  avatar_seed: string | null;
   group_points: number;
   knockout_points: number;
   carre_points: number;
   total: number;
+};
+
+/** Phases dans l'ordre chronologique. */
+export const PHASES = ["GROUPS", "R32", "R16", "QF", "SF", "3RD", "F"] as const;
+export type Phase = (typeof PHASES)[number];
+
+export const PHASE_LABEL: Record<Phase, string> = {
+  GROUPS: "Fin des poules",
+  R32: "Après les 1/16",
+  R16: "Après les 1/8",
+  QF: "Après les quarts",
+  SF: "Après les demis",
+  "3RD": "Après la 3e place",
+  F: "Final",
 };
 
 /**
@@ -73,10 +89,39 @@ export function scoreCarrePrediction(
   return [0, 1, 4, 7, 10][hits] ?? 0;
 }
 
-/** Calcule et renvoie le classement complet de la famille. */
-export async function computeLeaderboard(): Promise<Scoreboard[]> {
-  const profiles = await query<{ id: string; display_name: string }>(
-    `select id::text, display_name from profiles order by display_name asc`,
+function phaseRank(p: Phase): number {
+  return PHASES.indexOf(p);
+}
+
+const KNOCKOUT_PHASE_ORDER: Phase[] = ["R32", "R16", "QF", "SF", "3RD", "F"];
+
+/**
+ * Calcule et renvoie le classement complet de la famille.
+ * @param opts.through Si fourni, le calcul ne prend en compte que les
+ *   matchs/résultats jusqu'à cette phase (incluse). Permet d'afficher des
+ *   snapshots du classement à chaque étape (fin des poules, après les 1/16, …).
+ *   Le bonus Carré d'As n'entre dans le calcul qu'à partir des demi-finales.
+ */
+export async function computeLeaderboard(opts: {
+  through?: Phase;
+} = {}): Promise<Scoreboard[]> {
+  const through = opts.through;
+  const includeGroups = through === undefined || phaseRank(through) >= phaseRank("GROUPS");
+  const allowedKnockout = new Set<string>(
+    through === undefined
+      ? KNOCKOUT_PHASE_ORDER
+      : KNOCKOUT_PHASE_ORDER.filter((p) => phaseRank(p) <= phaseRank(through)),
+  );
+  const includeCarre = through === undefined || phaseRank(through) >= phaseRank("SF");
+
+  const profiles = await query<{
+    id: string;
+    display_name: string;
+    avatar_style: string;
+    avatar_seed: string | null;
+  }>(
+    `select id::text, display_name, avatar_style, avatar_seed
+       from profiles order by display_name asc`,
   );
 
   const groupPreds = await query<{
@@ -107,11 +152,12 @@ export async function computeLeaderboard(): Promise<Scoreboard[]> {
   );
   const knockoutResults = await query<{
     id: number;
+    stage: string;
     score_a: number | null;
     score_b: number | null;
     qualifier_team_id: number | null;
   }>(
-    `select id, score_a, score_b, qualifier_team_id from knockout_matches`,
+    `select id, stage, score_a, score_b, qualifier_team_id from knockout_matches`,
   );
   const knMap = new Map(knockoutResults.map((m) => [m.id, m]));
 
@@ -145,25 +191,28 @@ export async function computeLeaderboard(): Promise<Scoreboard[]> {
 
   return profiles
     .map((p) => {
-      const groupPts = groupPreds
-        .filter((gp) => gp.user_id === p.id)
-        .reduce((sum, gp) => {
-          const r = grMap.get(gp.group_letter);
-          if (!r) return sum;
-          return (
-            sum +
-            scoreGroupPrediction(
-              { first: gp.first_team_id, second: gp.second_team_id },
-              { first: r.first_team_id, second: r.second_team_id },
-            )
-          );
-        }, 0);
+      const groupPts = !includeGroups
+        ? 0
+        : groupPreds
+            .filter((gp) => gp.user_id === p.id)
+            .reduce((sum, gp) => {
+              const r = grMap.get(gp.group_letter);
+              if (!r) return sum;
+              return (
+                sum +
+                scoreGroupPrediction(
+                  { first: gp.first_team_id, second: gp.second_team_id },
+                  { first: r.first_team_id, second: r.second_team_id },
+                )
+              );
+            }, 0);
 
       const knockoutPts = knockoutPreds
         .filter((kp) => kp.user_id === p.id)
         .reduce((sum, kp) => {
           const m = knMap.get(kp.match_id);
           if (!m) return sum;
+          if (!allowedKnockout.has(m.stage)) return sum;
           return (
             sum +
             scoreKnockoutPrediction(
@@ -182,23 +231,29 @@ export async function computeLeaderboard(): Promise<Scoreboard[]> {
         }, 0);
 
       const carre = carrePreds.find((c) => c.user_id === p.id);
-      const carrePts = carre
-        ? scoreCarrePrediction(
-            [carre.team1_id, carre.team2_id, carre.team3_id, carre.team4_id],
-            actualSet,
-          )
-        : 0;
+      const carrePts =
+        includeCarre && carre
+          ? scoreCarrePrediction(
+              [carre.team1_id, carre.team2_id, carre.team3_id, carre.team4_id],
+              actualSet,
+            )
+          : 0;
 
       return {
         user_id: p.id,
         display_name: p.display_name,
+        avatar_style: p.avatar_style,
+        avatar_seed: p.avatar_seed,
         group_points: groupPts,
         knockout_points: knockoutPts,
         carre_points: carrePts,
         total: groupPts + knockoutPts + carrePts,
       } satisfies Scoreboard;
     })
-    .sort((a, b) => b.total - a.total || a.display_name.localeCompare(b.display_name));
+    .sort(
+      (a, b) =>
+        b.total - a.total || a.display_name.localeCompare(b.display_name),
+    );
 }
 
 export async function getGroupLockAt(): Promise<Date> {
@@ -211,4 +266,49 @@ export async function getGroupLockAt(): Promise<Date> {
 export async function isGroupStageLocked(): Promise<boolean> {
   const lockAt = await getGroupLockAt();
   return Date.now() >= lockAt.getTime();
+}
+
+/**
+ * Renvoie pour chaque phase si elle est "complétée" : tous les résultats sont
+ * saisis. Utile pour cocher les phases dispo dans la vue snapshot.
+ */
+export async function getPhaseCompletion(): Promise<Record<Phase, boolean>> {
+  const groups = await query<{
+    n: string;
+    filled: string;
+  }>(
+    `select count(*)::text as n,
+            count(*) filter (where first_team_id is not null and second_team_id is not null)::text as filled
+       from group_results`,
+  );
+  const knockout = await query<{
+    stage: string;
+    n: string;
+    filled: string;
+  }>(
+    `select stage,
+            count(*)::text as n,
+            count(*) filter (where score_a is not null and score_b is not null and qualifier_team_id is not null)::text as filled
+       from knockout_matches
+       group by stage`,
+  );
+  const knMap = new Map(knockout.map((k) => [k.stage, k]));
+
+  const groupsDone =
+    groups[0] && Number(groups[0].n) > 0 && groups[0].n === groups[0].filled;
+
+  function knockoutDone(stage: Phase): boolean {
+    const k = knMap.get(stage);
+    return !!k && Number(k.n) > 0 && k.n === k.filled;
+  }
+
+  return {
+    GROUPS: groupsDone,
+    R32: knockoutDone("R32"),
+    R16: knockoutDone("R16"),
+    QF: knockoutDone("QF"),
+    SF: knockoutDone("SF"),
+    "3RD": knockoutDone("3RD"),
+    F: knockoutDone("F"),
+  };
 }

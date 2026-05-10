@@ -15,6 +15,7 @@ const FILES = [
   "01_schema.sql",
   "02_seed_teams.sql",
   "03_seed_knockout.sql",
+  "04_avatars_and_sync.sql",
 ] as const;
 
 function loadEnvLocal() {

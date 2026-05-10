@@ -22,6 +22,8 @@ export type SessionUser = {
   email: string;
   display_name: string;
   is_admin: boolean;
+  avatar_style: string;
+  avatar_seed: string | null;
 };
 
 type JwtPayload = { sub: string };
@@ -70,7 +72,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   if (!payload) return null;
 
   return await queryOne<SessionUser>(
-    `select id::text, email, display_name, is_admin
+    `select id::text, email, display_name, is_admin, avatar_style, avatar_seed
        from profiles
        where id = $1`,
     [payload.sub],

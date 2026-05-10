@@ -3,7 +3,7 @@ import { jwtVerify } from "jose";
 
 const SESSION_COOKIE = "cdm_session";
 
-const PUBLIC_PATHS = ["/login", "/signup", "/api/health"];
+const PUBLIC_PATHS = ["/login", "/signup", "/api/health", "/api/sync-results"];
 
 function isPublic(pathname: string) {
   if (pathname === "/") return true;

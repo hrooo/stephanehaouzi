@@ -1,8 +1,9 @@
 # Coupe du Monde 2026 — Famille 🏆
 
 Plateforme de paris familiale pour la Coupe du Monde 2026, réservée aux membres
-inscrits. Stack : **Next.js 15** + **PostgreSQL** (sans Supabase, juste `pg`) +
-auth maison (bcrypt + cookie JWT).
+inscrits. Stack : **Next.js 16** + **PostgreSQL** (sans Supabase, juste `pg`) +
+auth maison (bcrypt + cookie JWT) + **avatars DiceBear** + **auto-sync** des
+résultats via football-data.org.
 
 ## Règles intégrées
 
@@ -27,6 +28,41 @@ deux premiers :
 Les pronostics de poule et de Carré d'As sont **verrouillés** au coup d'envoi du
 tournoi (11 juin 2026 17h UTC, configurable dans `settings`). Les pronostics
 d'élimination directe sont verrouillés match par match au coup d'envoi.
+
+## Avatars
+
+Chaque membre a un avatar SVG généré automatiquement (DiceBear), qu'il peut
+personnaliser depuis `/profile` :
+
+- **8 styles** au choix : Emojis fun, Robots, Portraits, Minimaliste, Cartoon
+  souriant, Avataaars classiques, Pixel art, Pouce.
+- Le dessin dépend du **pseudo de seed** : change-le pour piocher un autre
+  visage du même style.
+- Aucun upload, aucun stockage : tout est rendu côté serveur en SVG.
+
+## Synchro automatique des scores
+
+L'app peut récupérer les scores officiels toute seule depuis
+**football-data.org** (gratuit) :
+
+1. Crée une clé API gratuite : <https://www.football-data.org/client/register>
+2. Ajoute `FOOTBALL_DATA_API_KEY` à tes variables d'env (et `CRON_SECRET` si tu
+   déploies sur Vercel).
+3. Sur Vercel, le fichier `vercel.json` configure un cron qui appelle
+   `/api/sync-results` **toutes les 15 minutes**.
+4. L'admin peut aussi cliquer sur "Synchroniser maintenant" depuis `/admin`.
+
+Ce que la synchro fait :
+
+- Lie automatiquement nos 48 équipes aux IDs football-data via leurs noms /
+  codes (avec une table d'alias FR/EN).
+- Met à jour le **classement officiel des poules** (top 2 par poule).
+- Met à jour les **matchs à élimination** : équipes, date de coup d'envoi,
+  score final et équipe qualifiée (en gérant prolongations + tirs au but).
+- Stocke `last_sync_at` dans `settings` et l'affiche dans `/admin`.
+
+Si la clé API n'est pas configurée ou si le cron tombe en erreur, la saisie
+manuelle dans `/admin` reste totalement fonctionnelle.
 
 ## Démarrage en local
 
@@ -68,25 +104,35 @@ src/
   app/
     (app)/                     ← zone connectée
       dashboard/page.tsx       → vue d'ensemble + mon score
-      leaderboard/page.tsx     → classement famille
+      leaderboard/page.tsx     → classement (avec snapshot par phase)
+      profile/page.tsx         → choix d'avatar DiceBear
       predictions/
         groups/page.tsx        → top 2 par poule
         carre/page.tsx         → bonus Carré d'As
         knockout/page.tsx      → score + qualifié pour chaque match élim
-      admin/page.tsx           → saisie résultats (admin uniquement)
+      admin/page.tsx           → saisie résultats + bouton "sync now"
+    api/
+      sync-results/route.ts    → endpoint cron (auth admin OU bearer secret)
     login/page.tsx
     signup/page.tsx
     page.tsx                   ← landing publique
+  components/
+    Avatar.tsx                 → composant SVG (rendu serveur)
   lib/
     db.ts                      → pool Postgres
     auth.ts                    → bcrypt + JWT cookie
-    scoring.ts                 → moteur de calcul des points
+    avatar.ts                  → wrappers DiceBear + 8 styles
+    scoring.ts                 → moteur de calcul des points + snapshot par phase
+    football-data.ts           → client API football-data.org
+    sync.ts                    → matching équipes + mise à jour des résultats
 sql/
-  01_schema.sql                → schéma complet (idempotent)
+  01_schema.sql                → schéma de base (idempotent)
   02_seed_teams.sql            → 48 équipes / 12 groupes
   03_seed_knockout.sql         → 32 matchs élim avec dates indicatives
+  04_avatars_and_sync.sql      → colonnes avatar + external_id (sync)
 scripts/
-  setup-db.ts                  → exécute les 3 fichiers SQL
+  setup-db.ts                  → exécute les 4 fichiers SQL
+vercel.json                    → cron toutes les 15 min vers /api/sync-results
 ```
 
 ## Adapter le tirage au sort réel
